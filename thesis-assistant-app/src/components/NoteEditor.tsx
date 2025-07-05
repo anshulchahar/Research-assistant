@@ -1,6 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+'use client';
+
+import React, { useState, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useNoteStore } from '@/store/noteStore';
 import { Button } from '@/components/ui/button';
@@ -13,6 +15,7 @@ const NoteEditor = () => {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const selectedNote = notes.find(note => note.id === selectedNoteId);
 
@@ -37,6 +40,30 @@ const NoteEditor = () => {
     setSelectedNoteId(null);
     setTitle('');
     setContent('');
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch('/api/ocr', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setContent(prevContent => prevContent + '\n' + data.text);
+      } else {
+        console.error('Failed to extract text from image.');
+      }
+    } catch (error) {
+      console.error('Error uploading file:', error);
+    }
   };
 
   return (
@@ -66,10 +93,24 @@ const NoteEditor = () => {
             placeholder="Write your note in Markdown..."
             rows={15}
           />
-          <Button onClick={handleSaveNote}>Save Note</Button>
-          {selectedNoteId && (
-            <Button variant="destructive" onClick={() => removeNote(selectedNoteId)}>Delete Note</Button>
-          )}
+          <div className="flex justify-between">
+            <div>
+              <Button onClick={handleSaveNote}>Save Note</Button>
+              {selectedNoteId && (
+                <Button variant="destructive" onClick={() => removeNote(selectedNoteId)} className="ml-2">Delete Note</Button>
+              )}
+            </div>
+            <div>
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileUpload}
+                className="hidden"
+                accept="image/*,application/pdf"
+              />
+              <Button onClick={() => fileInputRef.current?.click()}>Upload Note</Button>
+            </div>
+          </div>
         </div>
         <div className="mt-4 border p-4 rounded-md">
           <ReactMarkdown>{content}</ReactMarkdown>
